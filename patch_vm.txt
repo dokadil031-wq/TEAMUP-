@@ -1,0 +1,26 @@
+--- app/src/main/java/com/example/MaidanViewModel.kt
++++ app/src/main/java/com/example/MaidanViewModel.kt
+@@ -10,6 +10,7 @@
+ import kotlinx.coroutines.flow.StateFlow
+ import kotlinx.coroutines.flow.asStateFlow
+ import kotlinx.coroutines.flow.stateIn
++import kotlinx.coroutines.tasks.await
+ import kotlinx.coroutines.launch
+ 
+ class MaidanViewModel(application: Application) : AndroidViewModel(application) {
+@@ -62,4 +63,14 @@
+             db.collection("matches").document(match.id).update("joined", match.joined + 1)
+         }
+     }
++
++    fun signUp(email: String, pass: String, onSuccess: () -> Unit, onError: (String) -> Unit) {
++        auth.createUserWithEmailAndPassword(email, pass)
++            .addOnSuccessListener { onSuccess() }
++            .addOnFailureListener { onError(it.message ?: "Error") }
++    }
++    fun signIn(email: String, pass: String, onSuccess: () -> Unit, onError: (String) -> Unit) {
++        auth.signInWithEmailAndPassword(email, pass)
++            .addOnSuccessListener { onSuccess() }
++            .addOnFailureListener { onError(it.message ?: "Error") }
++    }
+ }
