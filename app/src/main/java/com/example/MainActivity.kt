@@ -65,6 +65,9 @@ val LiveGreen = Color(0xFF22C55E)
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        try {
+            com.google.firebase.FirebaseApp.initializeApp(this)
+        } catch(e: Exception) { android.util.Log.e("INIT_ERROR", "Firebase init failed", e) }
         enableEdgeToEdge()
         setContent {
             MyApplicationTheme {
@@ -121,13 +124,22 @@ fun SplashScreen() {
 fun MaidanApp(modifier: Modifier = Modifier, viewModel: MaidanViewModel = viewModel()) {
     var showSplash by remember { mutableStateOf(true) }
     androidx.compose.runtime.LaunchedEffect(Unit) {
-        kotlinx.coroutines.delay(2000)
+        kotlinx.coroutines.delay(1000)
         showSplash = false
     }
     
 
 
-    var currentScreen by remember { mutableStateOf(if (viewModel.auth.currentUser != null) "main" else "auth") }
+    var currentScreen by remember { mutableStateOf("auth") }
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        try {
+            if (viewModel.auth.currentUser != null) {
+                currentScreen = "main"
+            }
+        } catch (e: Exception) {
+             e.printStackTrace()
+        }
+    }
     val userCity by viewModel.userCity.collectAsStateWithLifecycle()
     
     val contextForLocation = androidx.compose.ui.platform.LocalContext.current
@@ -187,9 +199,11 @@ fun MaidanApp(modifier: Modifier = Modifier, viewModel: MaidanViewModel = viewMo
             val appSign = "ead2e75a111bd2bfaddc3d0687cdd98175b3398"
             val config = com.zegocloud.uikit.prebuilt.call.invite.ZegoUIKitPrebuiltCallInvitationConfig()
             try {
-                com.zegocloud.uikit.prebuilt.call.ZegoUIKitPrebuiltCallService.init(
-                    application, appID, appSign, currentUser.uid, userName, config
-                )
+                try {
+                    com.zegocloud.uikit.prebuilt.call.ZegoUIKitPrebuiltCallService.init(
+                        application, appID, appSign, currentUser.uid, userName, config
+                    )
+                } catch(e: Exception) { e.printStackTrace() }
             } catch (e: Exception) {
                 e.printStackTrace()
                 android.widget.Toast.makeText(context, "Zego SDK Init Failed. AppSign might be invalid.", android.widget.Toast.LENGTH_LONG).show()
