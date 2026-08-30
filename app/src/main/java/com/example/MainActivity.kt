@@ -10,6 +10,7 @@ import com.google.firebase.FirebaseException
 import java.util.concurrent.TimeUnit
 import android.widget.Toast
 import android.os.Bundle
+import kotlinx.coroutines.launch
 import android.graphics.BitmapFactory
 import android.util.Base64
 import androidx.activity.ComponentActivity
@@ -116,7 +117,6 @@ fun SplashScreen() {
     }
 }
 
-@OptIn(com.google.accompanist.permissions.ExperimentalPermissionsApi::class)
 @Composable
 fun MaidanApp(modifier: Modifier = Modifier, viewModel: MaidanViewModel = viewModel()) {
     var showSplash by remember { mutableStateOf(true) }
@@ -130,18 +130,30 @@ fun MaidanApp(modifier: Modifier = Modifier, viewModel: MaidanViewModel = viewMo
     var currentScreen by remember { mutableStateOf(if (viewModel.auth.currentUser != null) "main" else "auth") }
     val userCity by viewModel.userCity.collectAsStateWithLifecycle()
     
-    val locationPermissions = com.google.accompanist.permissions.rememberMultiplePermissionsState(
-        permissions = listOf(
-            android.Manifest.permission.ACCESS_COARSE_LOCATION,
-            android.Manifest.permission.ACCESS_FINE_LOCATION
-        )
-    )
-
     val contextForLocation = androidx.compose.ui.platform.LocalContext.current
-    androidx.compose.runtime.LaunchedEffect(locationPermissions.allPermissionsGranted, currentScreen) {
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    val permissionLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissions ->
+        val granted = permissions[android.Manifest.permission.ACCESS_FINE_LOCATION] == true || permissions[android.Manifest.permission.ACCESS_COARSE_LOCATION] == true
+        if (granted && userCity.isEmpty()) {
+            scope.launch {
+                val city = LocationHelper.getCurrentCity(contextForLocation)
+                if (city != null) {
+                    viewModel.updateUserCity(city)
+                }
+            }
+        }
+    }
+
+    androidx.compose.runtime.LaunchedEffect(currentScreen) {
         if (currentScreen == "main") {
-            if (!locationPermissions.allPermissionsGranted) {
-                locationPermissions.launchMultiplePermissionRequest()
+            val hasPermission = androidx.core.content.ContextCompat.checkSelfPermission(contextForLocation, android.Manifest.permission.ACCESS_COARSE_LOCATION) == android.content.pm.PackageManager.PERMISSION_GRANTED
+            if (!hasPermission) {
+                permissionLauncher.launch(arrayOf(
+                    android.Manifest.permission.ACCESS_COARSE_LOCATION,
+                    android.Manifest.permission.ACCESS_FINE_LOCATION
+                ))
             } else if (userCity.isEmpty()) {
                 val city = LocationHelper.getCurrentCity(contextForLocation)
                 if (city != null) {
