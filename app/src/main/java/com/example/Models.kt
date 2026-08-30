@@ -35,5 +35,6 @@ data class UserProfile(
     val sports: List<String> = emptyList(),
     val averageRating: Double = 0.0,
     val reviewCount: Int = 0,
-    val profileImageBase64: String = ""
+    val profileImageBase64: String = "",
+    val city: String = ""
 )

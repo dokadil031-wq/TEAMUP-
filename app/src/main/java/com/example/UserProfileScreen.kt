@@ -37,6 +37,8 @@ fun UserProfileScreen(
     var reviewTextInput by remember { mutableStateOf("") }
     val currentUserName by viewModel.userName.collectAsStateWithLifecycle()
     val currentUserId = viewModel.auth.currentUser?.uid
+    val myRequests by viewModel.myRequests.collectAsStateWithLifecycle()
+    val myNotifications by viewModel.myNotifications.collectAsStateWithLifecycle()
     
     LaunchedEffect(targetUserId) {
         viewModel.getUserProfile(targetUserId) { profile = it }
@@ -76,31 +78,30 @@ fun UserProfileScreen(
             Spacer(modifier = Modifier.width(16.dp))
             Column {
                 Text(profile!!.name, color = Chalk, fontSize = 24.sp, fontWeight = FontWeight.Bold)
+                if (profile!!.age.isNotEmpty() || profile!!.gender.isNotEmpty()) {
+                    val ageStr = if (profile!!.age.isNotEmpty()) "${profile!!.age} yrs" else ""
+                    val separator = if (profile!!.age.isNotEmpty() && profile!!.gender.isNotEmpty()) " · " else ""
+                    val genderStr = profile!!.gender
+                    Text("$ageStr$separator$genderStr", color = Bench, fontSize = 13.sp, modifier = Modifier.padding(bottom = 4.dp))
+                }
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.Star, contentDescription = null, tint = Floodlight, modifier = Modifier.size(16.dp))
-                    Spacer(modifier = Modifier.width(4.dp))
-                    val avgRating = if (profile!!.reviewCount > 0) String.format("%.1f", profile!!.averageRating) else "No ratings"
+                    Text("TRUST SCORE: ", color = Bench, fontSize = 12.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+                    Icon(Icons.Default.Star, contentDescription = null, tint = Floodlight, modifier = Modifier.size(14.dp))
+                    Spacer(modifier = Modifier.width(2.dp))
+                    val avgRating = if (profile!!.reviewCount > 0) String.format("%.1f", profile!!.averageRating) else "New"
                     Text("$avgRating (${profile!!.reviewCount} reviews)", color = Floodlight, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
                 }
             }
         }
         
-        if (profile!!.sports.isNotEmpty()) {
-            Text("INTERESTS", color = Bench, fontSize = 12.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, modifier = Modifier.padding(bottom = 8.dp))
-            @OptIn(ExperimentalLayoutApi::class)
-            FlowRow(modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                profile!!.sports.forEach { s ->
-                    Box(modifier = Modifier.clip(RoundedCornerShape(20.dp)).background(Turf2).padding(horizontal = 14.dp, vertical = 6.dp)) {
-                        Text(s, color = Chalk, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-                    }
-                }
-            }
-        }
+
         
         // Add review section
         if (currentUserId != null && currentUserId != targetUserId) {
             val hasReviewed = reviews.any { it.reviewerId == currentUserId }
-            if (!hasReviewed) {
+            val hasPlayedTogether = myRequests.any { it.posterId == targetUserId && it.status == "accepted" } || 
+                                    myNotifications.any { it.requesterId == targetUserId && it.status == "accepted" }
+            if (!hasReviewed && hasPlayedTogether) {
                 Column(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(Turf).padding(16.dp).padding(bottom = 24.dp)) {
                     Text("Leave a Review", color = Chalk, fontSize = 16.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 12.dp))
                     Row(modifier = Modifier.padding(bottom = 12.dp)) {

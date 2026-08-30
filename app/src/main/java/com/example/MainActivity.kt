@@ -10,6 +10,8 @@ import com.google.firebase.FirebaseException
 import java.util.concurrent.TimeUnit
 import android.widget.Toast
 import android.os.Bundle
+import android.graphics.BitmapFactory
+import android.util.Base64
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -77,8 +79,77 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
+fun SplashScreen() {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black),
+        contentAlignment = Alignment.Center
+    ) {
+        androidx.compose.foundation.Image(
+            painter = androidx.compose.ui.res.painterResource(id = R.drawable.teamup_logo),
+            contentDescription = "App Logo",
+            modifier = Modifier.size(300.dp),
+            contentScale = ContentScale.Fit
+        )
+        Column(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 50.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                text = "from",
+                color = Color.White.copy(alpha = 0.6f),
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Normal
+            )
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                text = "NOROX",
+                color = Color.White,
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 1.5.sp
+            )
+        }
+    }
+}
+
+@OptIn(com.google.accompanist.permissions.ExperimentalPermissionsApi::class)
+@Composable
 fun MaidanApp(modifier: Modifier = Modifier, viewModel: MaidanViewModel = viewModel()) {
+    var showSplash by remember { mutableStateOf(true) }
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        kotlinx.coroutines.delay(2000)
+        showSplash = false
+    }
+    
+
+
     var currentScreen by remember { mutableStateOf(if (viewModel.auth.currentUser != null) "main" else "auth") }
+    val userCity by viewModel.userCity.collectAsStateWithLifecycle()
+    
+    val locationPermissions = com.google.accompanist.permissions.rememberMultiplePermissionsState(
+        permissions = listOf(
+            android.Manifest.permission.ACCESS_COARSE_LOCATION,
+            android.Manifest.permission.ACCESS_FINE_LOCATION
+        )
+    )
+
+    val contextForLocation = androidx.compose.ui.platform.LocalContext.current
+    androidx.compose.runtime.LaunchedEffect(locationPermissions.allPermissionsGranted, currentScreen) {
+        if (currentScreen == "main") {
+            if (!locationPermissions.allPermissionsGranted) {
+                locationPermissions.launchMultiplePermissionRequest()
+            } else if (userCity.isEmpty()) {
+                val city = LocationHelper.getCurrentCity(contextForLocation)
+                if (city != null) {
+                    viewModel.updateUserCity(city)
+                }
+            }
+        }
+    }
     var method by remember { mutableStateOf("phone") }
     var contact by remember { mutableStateOf("") }
     var otp by remember { mutableStateOf("") }
@@ -95,6 +166,24 @@ fun MaidanApp(modifier: Modifier = Modifier, viewModel: MaidanViewModel = viewMo
         ctx as Activity
     }
     val userName by viewModel.userName.collectAsStateWithLifecycle()
+    
+    val currentUser = viewModel.auth.currentUser
+    androidx.compose.runtime.LaunchedEffect(currentUser?.uid, userName) {
+        if (currentUser != null && userName.isNotEmpty()) {
+            val application = context.applicationContext as android.app.Application
+            val appID: Long = 259383851L
+            val appSign = "ead2e75a111bd2bfaddc3d0687cdd98175b3398"
+            val config = com.zegocloud.uikit.prebuilt.call.invite.ZegoUIKitPrebuiltCallInvitationConfig()
+            try {
+                com.zegocloud.uikit.prebuilt.call.ZegoUIKitPrebuiltCallService.init(
+                    application, appID, appSign, currentUser.uid, userName, config
+                )
+            } catch (e: Exception) {
+                e.printStackTrace()
+                android.widget.Toast.makeText(context, "Zego SDK Init Failed. AppSign might be invalid.", android.widget.Toast.LENGTH_LONG).show()
+            }
+        }
+    }
     val userAge by viewModel.userAge.collectAsStateWithLifecycle()
     val userGender by viewModel.userGender.collectAsStateWithLifecycle()
     val userSports by viewModel.userSports.collectAsStateWithLifecycle()
@@ -110,6 +199,9 @@ fun MaidanApp(modifier: Modifier = Modifier, viewModel: MaidanViewModel = viewMo
     var selectedRequest by remember { mutableStateOf<MatchRequest?>(null) }
     var targetUserId by remember { mutableStateOf<String?>(null) }
 
+    if (showSplash) {
+        SplashScreen()
+    } else {
     Box(
         modifier = modifier
             .fillMaxSize()
@@ -180,7 +272,12 @@ fun MaidanApp(modifier: Modifier = Modifier, viewModel: MaidanViewModel = viewMo
                     viewModel.auth.signInWithCredential(credential)
                         .addOnCompleteListener(activity) { task ->
                             if (task.isSuccessful) {
-                                currentScreen = "profileSetup"
+                                val isNew = task.result?.additionalUserInfo?.isNewUser ?: false
+                                if (isNew) {
+                                    currentScreen = "profileSetup"
+                                } else {
+                                    currentScreen = "main"
+                                }
                             } else {
                                 Toast.makeText(activity, "Invalid OTP", Toast.LENGTH_SHORT).show()
                             }
@@ -291,6 +388,9 @@ fun MaidanApp(modifier: Modifier = Modifier, viewModel: MaidanViewModel = viewMo
             currentScreen == "chat" && selectedRequest != null -> {
                 ChatScreen(request = selectedRequest!!, viewModel = viewModel, onBack = { currentScreen = "main" })
             }
+            currentScreen == "userProfile" && targetUserId != null -> {
+                UserProfileScreen(targetUserId = targetUserId!!, viewModel = viewModel, onBack = { currentScreen = "main" })
+            }
             currentScreen == "main" -> {
                 Column(modifier = Modifier.fillMaxSize()) {
                     Box(modifier = Modifier.weight(1f)) {
@@ -308,7 +408,6 @@ fun MaidanApp(modifier: Modifier = Modifier, viewModel: MaidanViewModel = viewMo
                             "CreatePost" -> CreatePostScreen(viewModel = viewModel, onPostCreated = { currentTab = "Home" })
                             "Messages" -> MessagesScreen(viewModel = viewModel, onChatClick = { req -> selectedRequest = req; currentScreen = "chat" })
                             "Profile" -> ProfileScreen(viewModel, onEditProfileClick = { currentScreen = "editProfile" }, onLogoutClick = { viewModel.auth.signOut(); currentScreen = "auth" })
-                            "userProfile" -> if (targetUserId != null) UserProfileScreen(targetUserId = targetUserId!!, viewModel = viewModel, onBack = { currentScreen = "main" })
                         }
                     }
                     
@@ -341,6 +440,7 @@ fun MaidanApp(modifier: Modifier = Modifier, viewModel: MaidanViewModel = viewMo
             }
         }
     }
+    }
 }
 
 @Composable
@@ -368,7 +468,9 @@ fun StepDots(active: Int) {
 
 @Composable
 fun FeedScreen(viewModel: MaidanViewModel, onMatchClick: (MatchEntity) -> Unit, onNotificationsClick: () -> Unit, userName: String, onPosterClick: (String) -> Unit) {
-    val matches by viewModel.allMatches.collectAsStateWithLifecycle()
+    val allMatches by viewModel.allMatches.collectAsStateWithLifecycle()
+    val userCity by viewModel.userCity.collectAsStateWithLifecycle()
+    val matches = allMatches.filter { it.city.equals(userCity, ignoreCase = true) || it.city.isEmpty() || userCity.isEmpty() }
     val myRequests by viewModel.myRequests.collectAsStateWithLifecycle()
     val uid = viewModel.auth.currentUser?.uid
     var category by remember { mutableStateOf("All") }
@@ -467,9 +569,28 @@ fun MatchCard(m: MatchEntity, onClick: () -> Unit, onJoinClick: (() -> Unit)? = 
     Column(
         modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Turf).border(1.dp, Line, RoundedCornerShape(16.dp)).clickable { onClick() }
     ) {
-        Row(modifier = Modifier.padding(start = 18.dp, top = 14.dp, end = 18.dp, bottom = 10.dp).clickable { onPosterClick?.invoke() }, verticalAlignment = Alignment.CenterVertically) {
-            Box(modifier = Modifier.size(26.dp).clip(CircleShape).background(Turf2), contentAlignment = Alignment.Center) {
-                Text(m.posterName.firstOrNull()?.toString() ?: "?", color = Floodlight, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+        Row(modifier = Modifier.fillMaxWidth().clickable { onPosterClick?.invoke() }.padding(start = 18.dp, top = 14.dp, end = 18.dp, bottom = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+            val bitmap = androidx.compose.runtime.remember(m.posterImageBase64) {
+                if (m.posterImageBase64.isNotEmpty()) {
+                    try {
+                        val imageBytes = android.util.Base64.decode(m.posterImageBase64, android.util.Base64.DEFAULT)
+                        android.graphics.BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size)
+                    } catch (e: Exception) {
+                        null
+                    }
+                } else null
+            }
+            if (bitmap != null) {
+                androidx.compose.foundation.Image(
+                    bitmap = bitmap.asImageBitmap(),
+                    contentDescription = null,
+                    modifier = Modifier.size(26.dp).clip(CircleShape),
+                    contentScale = androidx.compose.ui.layout.ContentScale.Crop
+                )
+            } else {
+                Box(modifier = Modifier.size(26.dp).clip(CircleShape).background(Turf2), contentAlignment = Alignment.Center) {
+                    Text(m.posterName.firstOrNull()?.toString() ?: "?", color = Floodlight, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                }
             }
             Spacer(modifier = Modifier.width(8.dp))
             Text(m.posterName, color = Chalk, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)

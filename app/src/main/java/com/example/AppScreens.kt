@@ -54,9 +54,28 @@ fun PostDetailScreen(match: MatchEntity, viewModel: MaidanViewModel, onBack: () 
             Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = Bench)
         }
         
-        Row(modifier = Modifier.padding(bottom = 18.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(modifier = Modifier.size(44.dp).clip(CircleShape).background(Turf2), contentAlignment = Alignment.Center) {
-                Text(match.posterName.first().toString(), color = Floodlight, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+        Row(modifier = Modifier.fillMaxWidth().clickable { if (match.posterId.isNotEmpty()) onPosterClick(match.posterId) }.padding(bottom = 18.dp, top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+            val bitmap = androidx.compose.runtime.remember(match.posterImageBase64) {
+                if (match.posterImageBase64.isNotEmpty()) {
+                    try {
+                        val imageBytes = android.util.Base64.decode(match.posterImageBase64, android.util.Base64.DEFAULT)
+                        android.graphics.BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size)
+                    } catch (e: Exception) {
+                        null
+                    }
+                } else null
+            }
+            if (bitmap != null) {
+                androidx.compose.foundation.Image(
+                    bitmap = bitmap.asImageBitmap(),
+                    contentDescription = null,
+                    modifier = Modifier.size(44.dp).clip(CircleShape),
+                    contentScale = androidx.compose.ui.layout.ContentScale.Crop
+                )
+            } else {
+                Box(modifier = Modifier.size(44.dp).clip(CircleShape).background(Turf2), contentAlignment = Alignment.Center) {
+                    Text(match.posterName.first().toString(), color = Floodlight, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                }
             }
             Spacer(modifier = Modifier.width(10.dp))
             Column {
@@ -129,7 +148,7 @@ fun PostDetailScreen(match: MatchEntity, viewModel: MaidanViewModel, onBack: () 
             }
         } else if (requestStatus == "requested" || requestStatus == "pending") {
             Button(
-                onClick = { },
+                onClick = { viewModel.cancelRequest(match.id) },
                 colors = ButtonDefaults.buttonColors(containerColor = Turf2, contentColor = Bench),
                 shape = RoundedCornerShape(12.dp),
                 contentPadding = PaddingValues(vertical = 15.dp),
@@ -137,22 +156,22 @@ fun PostDetailScreen(match: MatchEntity, viewModel: MaidanViewModel, onBack: () 
             ) {
                 Icon(Icons.Default.Schedule, contentDescription = null, modifier = Modifier.size(16.dp))
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("Requested", fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                Text("Cancel Request", fontSize = 15.sp, fontWeight = FontWeight.Bold)
             }
-            Text("${match.posterName.split(" ").first()} will get a notification to accept.", color = Bench, fontSize = 12.sp, modifier = Modifier.padding(top = 10.dp).fillMaxWidth(), textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+            Text("Tap to cancel your pending request.", color = Bench, fontSize = 12.sp, modifier = Modifier.padding(top = 10.dp).fillMaxWidth(), textAlign = androidx.compose.ui.text.style.TextAlign.Center)
         } else if (requestStatus == "accepted") {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                 Button(
-                    onClick = { },
+                    onClick = { viewModel.cancelRequest(match.id) },
                     colors = ButtonDefaults.buttonColors(containerColor = Turf2, contentColor = Floodlight),
                     shape = RoundedCornerShape(12.dp),
                     contentPadding = PaddingValues(vertical = 15.dp),
                     border = androidx.compose.foundation.BorderStroke(1.dp, Line),
                     modifier = Modifier.weight(1f)
                 ) {
-                    Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Icon(Icons.Default.Close, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("You're in", fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                    Text("Cancel", fontSize = 15.sp, fontWeight = FontWeight.Bold)
                 }
                 Button(
                     onClick = onMessageClick,
@@ -185,56 +204,10 @@ fun PostDetailScreen(match: MatchEntity, viewModel: MaidanViewModel, onBack: () 
 
 @Composable
 fun LiveScreen() {
+    val context = androidx.compose.ui.platform.LocalContext.current
     var isStreaming by remember { mutableStateOf(false) }
     if (isStreaming) {
-        Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
-            // Fake Camera Preview
-            Column(modifier = Modifier.fillMaxSize(), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
-                Icon(Icons.Default.Videocam, contentDescription = null, tint = Bench.copy(alpha = 0.5f), modifier = Modifier.size(64.dp))
-                Spacer(modifier = Modifier.height(8.dp))
-                Text("Camera Preview Active", color = Bench.copy(alpha = 0.5f))
-            }
-            
-            // Overlay
-            Column(modifier = Modifier.fillMaxSize().padding(22.dp)) {
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Row(
-                        modifier = Modifier.clip(RoundedCornerShape(8.dp)).background(Whistle).padding(horizontal = 8.dp, vertical = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(Color.White))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("LIVE", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                    }
-                    Box(modifier = Modifier.clip(RoundedCornerShape(8.dp)).background(Pitch.copy(alpha = 0.5f)).padding(horizontal = 8.dp, vertical = 4.dp)) {
-                        Text("12 viewers", color = Chalk, fontSize = 12.sp)
-                    }
-                }
-                Spacer(modifier = Modifier.weight(1f))
-                
-                // Chat and End Stream
-                Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    TextField(
-                        value = "", onValueChange = {},
-                        placeholder = { Text("Say something...", color = Bench) },
-                        modifier = Modifier.weight(1f).height(50.dp).clip(RoundedCornerShape(25.dp)),
-                        colors = TextFieldDefaults.colors(
-                            focusedContainerColor = Turf2.copy(alpha=0.7f),
-                            unfocusedContainerColor = Turf2.copy(alpha=0.7f),
-                            focusedIndicatorColor = Color.Transparent,
-                            unfocusedIndicatorColor = Color.Transparent
-                        )
-                    )
-                    Spacer(modifier = Modifier.width(12.dp))
-                    IconButton(
-                        onClick = { isStreaming = false },
-                        modifier = Modifier.size(50.dp).clip(CircleShape).background(Color(0xFFE53935))
-                    ) {
-                        Icon(Icons.Default.Close, contentDescription = "End Stream", tint = Color.White)
-                    }
-                }
-            }
-        }
+        // We will never hit this in the real app because we launch an intent.
     } else {
         Column(modifier = Modifier.fillMaxSize().padding(horizontal = 22.dp, vertical = 16.dp)) {
             Row(
@@ -316,6 +289,10 @@ fun ChatScreen(request: MatchRequest, viewModel: MaidanViewModel, onBack: () -> 
     
     Column(modifier = Modifier.fillMaxSize()) {
         // Header
+        val isMeRequester = viewModel.auth.currentUser?.uid == request.requesterId
+        val targetUserId = if (isMeRequester) request.posterId else request.requesterId
+        val targetUserName = if (isMeRequester) request.posterId else request.requesterName
+        
         Row(
             modifier = Modifier.fillMaxWidth().background(Turf).padding(horizontal = 16.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically
@@ -324,6 +301,28 @@ fun ChatScreen(request: MatchRequest, viewModel: MaidanViewModel, onBack: () -> 
                 Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Chalk)
             }
             Text("Chat", color = Chalk, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+            Spacer(modifier = Modifier.weight(1f))
+            androidx.compose.ui.viewinterop.AndroidView(
+                factory = { context ->
+                    com.zegocloud.uikit.prebuilt.call.invite.widget.ZegoSendCallInvitationButton(context).apply {
+                        setIsVideoCall(false)
+                        setResourceID("zego_uikit_call")
+                        setInvitees(listOf(com.zegocloud.uikit.service.defines.ZegoUIKitUser(targetUserId, targetUserName)))
+                    }
+                },
+                modifier = Modifier.size(40.dp)
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            androidx.compose.ui.viewinterop.AndroidView(
+                factory = { context ->
+                    com.zegocloud.uikit.prebuilt.call.invite.widget.ZegoSendCallInvitationButton(context).apply {
+                        setIsVideoCall(true)
+                        setResourceID("zego_uikit_call")
+                        setInvitees(listOf(com.zegocloud.uikit.service.defines.ZegoUIKitUser(targetUserId, targetUserName)))
+                    }
+                },
+                modifier = Modifier.size(40.dp)
+            )
         }
         
         // Messages list
@@ -427,6 +426,8 @@ fun NotificationsScreen(viewModel: MaidanViewModel, onBack: () -> Unit) {
 @Composable
 fun CreatePostScreen(viewModel: MaidanViewModel, onPostCreated: () -> Unit) {
     val userName by viewModel.userName.collectAsStateWithLifecycle()
+    val userImage by viewModel.userImage.collectAsStateWithLifecycle()
+    val userCity by viewModel.userCity.collectAsStateWithLifecycle()
     var category by remember { mutableStateOf("") }
     var sport by remember { mutableStateOf("") }
     var title by remember { mutableStateOf("") }
@@ -434,8 +435,10 @@ fun CreatePostScreen(viewModel: MaidanViewModel, onPostCreated: () -> Unit) {
     var location by remember { mutableStateOf("") }
     var dateStr by remember { mutableStateOf("") }
     var timeStr by remember { mutableStateOf("") }
+    var matchTimestamp by remember { mutableStateOf(0L) }
     var audience by remember { mutableStateOf("All") }
     var totalPlayers by remember { mutableStateOf(4) }
+    var playersDropdownExpanded by remember { mutableStateOf(false) }
     val context = androidx.compose.ui.platform.LocalContext.current
     
     val categories = listOf("Sports", "Online gaming", "Exercise", "Group", "Other")
@@ -523,6 +526,9 @@ fun CreatePostScreen(viewModel: MaidanViewModel, onPostCreated: () -> Unit) {
                                     val ampm = if (h >= 12) "PM" else "AM"
                                     val hr = if (h % 12 == 0) 12 else h % 12
                                     timeStr = String.format("%02d:%02d %s", hr, min, ampm)
+                                    val selectedCal = java.util.Calendar.getInstance()
+                                    selectedCal.set(y, m, d, h, min, 0)
+                                    matchTimestamp = selectedCal.timeInMillis
                                 },
                                 cal.get(java.util.Calendar.HOUR_OF_DAY),
                                 cal.get(java.util.Calendar.MINUTE),
@@ -546,16 +552,26 @@ fun CreatePostScreen(viewModel: MaidanViewModel, onPostCreated: () -> Unit) {
         
         Text("WHO CAN SEE THIS POST", color = Bench, fontSize = 12.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, modifier = Modifier.padding(bottom = 8.dp))
         Text("TOTAL PLAYERS NEEDED", color = Bench, fontSize = 12.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, modifier = Modifier.padding(bottom = 6.dp))
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(bottom = 14.dp)) {
-            Slider(
-                value = totalPlayers.toFloat(),
-                onValueChange = { totalPlayers = it.toInt() },
-                valueRange = 2f..22f,
-                steps = 20,
-                modifier = Modifier.weight(1f)
-            )
-            Spacer(modifier = Modifier.width(16.dp))
-            Text(totalPlayers.toString(), color = Chalk, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+        Box(modifier = Modifier.fillMaxWidth().padding(bottom = 14.dp)) {
+            Box(modifier = Modifier.fillMaxWidth().height(50.dp).border(1.dp, Line, RoundedCornerShape(10.dp)).background(Turf2, RoundedCornerShape(10.dp)).clickable { playersDropdownExpanded = true }, contentAlignment = Alignment.CenterStart) {
+                Text(text = totalPlayers.toString(), color = Chalk, fontSize = 14.sp, modifier = Modifier.padding(start = 16.dp))
+                Icon(Icons.Default.ArrowDropDown, contentDescription = null, tint = Bench, modifier = Modifier.align(Alignment.CenterEnd).padding(end = 16.dp))
+            }
+            DropdownMenu(
+                expanded = playersDropdownExpanded,
+                onDismissRequest = { playersDropdownExpanded = false },
+                modifier = Modifier.background(Turf2).heightIn(max = 200.dp)
+            ) {
+                (2..22).forEach { num ->
+                    DropdownMenuItem(
+                        text = { Text(num.toString(), color = Chalk) },
+                        onClick = {
+                            totalPlayers = num
+                            playersDropdownExpanded = false
+                        }
+                    )
+                }
+            }
         }
         
         Text("WHO CAN SEE THIS POST", color = Bench, fontSize = 12.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, modifier = Modifier.padding(bottom = 8.dp))
@@ -579,6 +595,7 @@ fun CreatePostScreen(viewModel: MaidanViewModel, onPostCreated: () -> Unit) {
             onClick = {
                 val newMatch = MatchEntity(
                     category = category,
+                    city = userCity,
                     sport = sport,
                     title = title,
                     location = location,
@@ -587,7 +604,9 @@ fun CreatePostScreen(viewModel: MaidanViewModel, onPostCreated: () -> Unit) {
                     total = totalPlayers,
                     audience = audience,
                     posterName = if (userName.isNotEmpty()) userName else "You",
-                    posterTrust = 0.0
+                    posterTrust = 0.0,
+                    timestamp = matchTimestamp,
+                    posterImageBase64 = userImage
                 )
                 viewModel.addMatch(newMatch)
                 onPostCreated()
@@ -605,31 +624,30 @@ fun CreatePostScreen(viewModel: MaidanViewModel, onPostCreated: () -> Unit) {
 @Composable
 fun ProfileScreen(viewModel: MaidanViewModel, onEditProfileClick: () -> Unit = {}, onLogoutClick: () -> Unit = {}) {
     val userName by viewModel.userName.collectAsStateWithLifecycle()
+    val userImage by viewModel.userImage.collectAsStateWithLifecycle()
+    val userCity by viewModel.userCity.collectAsStateWithLifecycle()
     val userAge by viewModel.userAge.collectAsStateWithLifecycle()
     val userGender by viewModel.userGender.collectAsStateWithLifecycle()
     val userSports by viewModel.userSports.collectAsStateWithLifecycle()
-    val userImage by viewModel.userImage.collectAsStateWithLifecycle()
     
     val context = LocalContext.current
-    val launcher = rememberLauncherForActivityResult(contract = ActivityResultContracts.PickVisualMedia()) { uri: Uri? ->
-        uri?.let {
-            try {
-                val inputStream: InputStream? = context.contentResolver.openInputStream(it)
-                val originalBitmap = BitmapFactory.decodeStream(inputStream)
-                // Resize and compress
-                val maxSize = 400
-                val ratio = Math.min(maxSize.toFloat() / originalBitmap.width, maxSize.toFloat() / originalBitmap.height)
-                val width = Math.round(ratio * originalBitmap.width)
-                val height = Math.round(ratio * originalBitmap.height)
-                val resizedBitmap = Bitmap.createScaledBitmap(originalBitmap, width, height, false)
-                val outputStream = ByteArrayOutputStream()
-                resizedBitmap.compress(Bitmap.CompressFormat.JPEG, 70, outputStream)
-                val byteArray = outputStream.toByteArray()
-                val base64 = Base64.encodeToString(byteArray, Base64.DEFAULT)
-                viewModel.updateProfilePhoto(base64)
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
+    val launcher = androidx.activity.compose.rememberLauncherForActivityResult(
+        contract = androidx.activity.result.contract.ActivityResultContracts.TakePicturePreview()
+    ) { bitmap: android.graphics.Bitmap? ->
+        if (bitmap != null) {
+            val outputStream = java.io.ByteArrayOutputStream()
+            bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 80, outputStream)
+            val byteArray = outputStream.toByteArray()
+            val base64 = android.util.Base64.encodeToString(byteArray, android.util.Base64.DEFAULT)
+            viewModel.updateProfilePhoto(base64)
+        }
+    }
+
+    val cameraPermissionLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        contract = androidx.activity.result.contract.ActivityResultContracts.RequestPermission()
+    ) { isGranted: Boolean ->
+        if (isGranted) {
+            launcher.launch(null)
         }
     }
 
@@ -650,7 +668,13 @@ fun ProfileScreen(viewModel: MaidanViewModel, onEditProfileClick: () -> Unit = {
                     .size(80.dp)
                     .clip(CircleShape)
                     .background(Turf2)
-                    .clickable { launcher.launch(androidx.activity.result.PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
+                    .clickable {
+                        if (androidx.core.content.ContextCompat.checkSelfPermission(context, android.Manifest.permission.CAMERA) == android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                            launcher.launch(null)
+                        } else {
+                            cameraPermissionLauncher.launch(android.Manifest.permission.CAMERA)
+                        }
+                    },
                 contentAlignment = Alignment.Center
             ) {
                 if (userImage.isNotEmpty()) {

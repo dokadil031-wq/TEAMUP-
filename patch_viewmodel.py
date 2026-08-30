@@ -1,114 +1,133 @@
+import re
+
 with open("app/src/main/java/com/example/MaidanViewModel.kt", "r") as f:
     content = f.read()
 
-target_imports = "import kotlinx.coroutines.launch"
-replacement_imports = """import kotlinx.coroutines.launch
-import com.google.firebase.firestore.Query"""
-content = content.replace(target_imports, replacement_imports)
-
-target_vars = """    private val _allMatches = MutableStateFlow<List<MatchEntity>>(emptyList())
-    val allMatches: StateFlow<List<MatchEntity>> = _allMatches.asStateFlow()"""
-replacement_vars = target_vars + """
-
-    private val _myRequests = MutableStateFlow<List<MatchRequest>>(emptyList())
-    val myRequests: StateFlow<List<MatchRequest>> = _myRequests.asStateFlow()
-
-    private val _myNotifications = MutableStateFlow<List<MatchRequest>>(emptyList())
-    val myNotifications: StateFlow<List<MatchRequest>> = _myNotifications.asStateFlow()"""
-content = content.replace(target_vars, replacement_vars)
-
 target_init = """    init {
         auth.firebaseAuthSettings.setAppVerificationDisabledForTesting(true)
-        listenToMatches()
-    }"""
-replacement_init = """    init {
+        listenToMatches()"""
+
+repl_init = """    init {
         auth.firebaseAuthSettings.setAppVerificationDisabledForTesting(true)
         listenToMatches()
-        
-        auth.addAuthStateListener {
-            if (it.currentUser != null) {
-                listenToMyRequests()
-                listenToMyNotifications()
-            } else {
-                _myRequests.value = emptyList()
-                _myNotifications.value = emptyList()
+        viewModelScope.launch {
+            while (true) {
+                kotlinx.coroutines.delay(30000) // check every 30 seconds
+                checkAndDeleteExpiredMatches()
             }
-        }
-    }
-    
-    private fun listenToMyRequests() {
-        val uid = auth.currentUser?.uid ?: return
-        db.collection("requests").whereEqualTo("requesterId", uid).addSnapshotListener { snap, err ->
-            if (snap != null) {
-                _myRequests.value = snap.documents.mapNotNull { it.toObject(MatchRequest::class.java)?.apply { id = it.id } }
+        }"""
+
+content = content.replace(target_init, repl_init)
+
+target_listen = """    private fun listenToMatches() {
+        db.collection("matches").addSnapshotListener { snapshot, error ->
+            if (error != null) {
+                android.util.Log.e("FirestoreError", "Listen failed.", error)
+                return@addSnapshotListener
             }
-        }
-    }
-    
-    private fun listenToMyNotifications() {
-        val uid = auth.currentUser?.uid ?: return
-        db.collection("requests").whereEqualTo("posterId", uid).addSnapshotListener { snap, err ->
-            if (snap != null) {
-                _myNotifications.value = snap.documents.mapNotNull { it.toObject(MatchRequest::class.java)?.apply { id = it.id } }
+            if (snapshot != null) {
+                val matches = snapshot.documents.mapNotNull { doc ->
+                    doc.toObject(MatchEntity::class.java)?.apply { id = doc.id }
+                }
+                
+                val currentTime = System.currentTimeMillis()
+                val validMatches = mutableListOf<MatchEntity>()
+                
+                for (match in matches) {
+                    var shouldDelete = false
+                    if (match.fullAtTimestamp != null && match.fullAtTimestamp > 0) {
+                        // 30 minutes = 30 * 60 * 1000 = 1800000 ms
+                        if (currentTime > match.fullAtTimestamp + 1800000L) {
+                            shouldDelete = true
+                        }
+                    } else if (match.joined < match.total && match.timestamp > 0) {
+                        // Delete right at match time if not full
+                        if (currentTime > match.timestamp) {
+                            shouldDelete = true
+                        }
+                    }
+                    
+                    if (shouldDelete) {
+                        db.collection("matches").document(match.id).delete()
+                    } else {
+                        validMatches.add(match)
+                    }
+                }
+                _allMatches.value = validMatches
+                
             }
         }
     }"""
-content = content.replace(target_init, replacement_init)
 
-target_addmatch = "        ref.set(match.copy(id = ref.id)).addOnFailureListener {"
-replacement_addmatch = "        ref.set(match.copy(id = ref.id, posterId = auth.currentUser?.uid ?: \"\")).addOnFailureListener {"
-content = content.replace(target_addmatch, replacement_addmatch)
-
-target_joinmatch = """    fun joinMatch(match: MatchEntity) {
-        if (match.id.isNotEmpty()) {
-            db.collection("matches").document(match.id).update("joined", match.joined + 1)
+repl_listen = """    private fun listenToMatches() {
+        db.collection("matches").addSnapshotListener { snapshot, error ->
+            if (error != null) {
+                android.util.Log.e("FirestoreError", "Listen failed.", error)
+                return@addSnapshotListener
+            }
+            if (snapshot != null) {
+                val matches = snapshot.documents.mapNotNull { doc ->
+                    doc.toObject(MatchEntity::class.java)?.apply { id = doc.id }
+                }
+                
+                val currentTime = System.currentTimeMillis()
+                val validMatches = mutableListOf<MatchEntity>()
+                
+                for (match in matches) {
+                    var shouldDelete = false
+                    if (match.fullAtTimestamp != null && match.fullAtTimestamp > 0) {
+                        // 30 minutes = 30 * 60 * 1000 = 1800000 ms
+                        if (currentTime >= match.fullAtTimestamp + 1800000L) {
+                            shouldDelete = true
+                        }
+                    } else if (match.joined >= match.total && match.timestamp > 0) {
+                        // Fallback for legacy matches
+                        if (currentTime >= match.timestamp + 1800000L) {
+                            shouldDelete = true
+                        }
+                    } else if (match.joined < match.total && match.timestamp > 0) {
+                        // Delete right at match time if not full
+                        if (currentTime >= match.timestamp) {
+                            shouldDelete = true
+                        }
+                    }
+                    
+                    if (shouldDelete) {
+                        db.collection("matches").document(match.id).delete()
+                    } else {
+                        validMatches.add(match)
+                    }
+                }
+                _allMatches.value = validMatches
+            }
         }
-    }"""
-replacement_joinmatch = target_joinmatch + """
+    }
 
-    fun requestToJoinMatch(match: MatchEntity, userName: String) {
-        val uid = auth.currentUser?.uid ?: return
-        val req = MatchRequest(
-            matchId = match.id,
-            matchTitle = match.title,
-            requesterId = uid,
-            requesterName = userName,
-            posterId = match.posterId,
-            status = "pending"
-        )
-        val ref = db.collection("requests").document()
-        ref.set(req.copy(id = ref.id))
-    }
-    
-    fun acceptRequest(req: MatchRequest) {
-        db.collection("requests").document(req.id).update("status", "accepted")
-        db.collection("matches").document(req.matchId).get().addOnSuccessListener { doc ->
-            val joined = doc.getLong("joined") ?: 0
-            doc.reference.update("joined", joined + 1)
-        }
-    }
-    
-    fun rejectRequest(req: MatchRequest) {
-        db.collection("requests").document(req.id).delete()
-    }
-    
-    fun getMessages(requestId: String, onUpdate: (List<ChatMessage>) -> Unit) {
-        db.collection("requests").document(requestId).collection("messages")
-            .orderBy("timestamp", Query.Direction.ASCENDING)
-            .addSnapshotListener { snap, _ ->
-                if (snap != null) {
-                    onUpdate(snap.documents.mapNotNull { it.toObject(ChatMessage::class.java)?.apply { id = it.id } })
+    private fun checkAndDeleteExpiredMatches() {
+        val currentTime = System.currentTimeMillis()
+        val currentMatches = _allMatches.value
+        for (match in currentMatches) {
+            var shouldDelete = false
+            if (match.fullAtTimestamp != null && match.fullAtTimestamp > 0) {
+                if (currentTime >= match.fullAtTimestamp + 1800000L) {
+                    shouldDelete = true
+                }
+            } else if (match.joined >= match.total && match.timestamp > 0) {
+                if (currentTime >= match.timestamp + 1800000L) {
+                    shouldDelete = true
+                }
+            } else if (match.joined < match.total && match.timestamp > 0) {
+                if (currentTime >= match.timestamp) {
+                    shouldDelete = true
                 }
             }
-    }
-    
-    fun sendMessage(requestId: String, text: String) {
-        val uid = auth.currentUser?.uid ?: return
-        val ref = db.collection("requests").document(requestId).collection("messages").document()
-        ref.set(ChatMessage(id = ref.id, senderId = uid, text = text, timestamp = System.currentTimeMillis()))
+            if (shouldDelete) {
+                db.collection("matches").document(match.id).delete()
+            }
+        }
     }"""
-content = content.replace(target_joinmatch, replacement_joinmatch)
+
+content = content.replace(target_listen, repl_listen)
 
 with open("app/src/main/java/com/example/MaidanViewModel.kt", "w") as f:
     f.write(content)
-

@@ -17,7 +17,8 @@ class UserPreferencesRepository(private val dataStore: DataStore<Preferences>) {
     private val GENDER_KEY = stringPreferencesKey("user_gender")
     private val SPORTS_KEY = stringPreferencesKey("user_sports")
     private val IMAGE_KEY = stringPreferencesKey("user_image")
-    
+    private val CITY_KEY = stringPreferencesKey("user_city")
+
     val userName: Flow<String> = dataStore.data.map { preferences ->
         preferences[NAME_KEY] ?: ""
     }
@@ -39,6 +40,10 @@ class UserPreferencesRepository(private val dataStore: DataStore<Preferences>) {
         preferences[IMAGE_KEY] ?: ""
     }
 
+    val userCity: Flow<String> = dataStore.data.map { preferences ->
+        preferences[CITY_KEY] ?: ""
+    }
+
     suspend fun saveUserProfile(name: String, age: String, gender: String, sports: List<String>) {
         dataStore.edit { preferences ->
             preferences[NAME_KEY] = name
@@ -51,6 +56,18 @@ class UserPreferencesRepository(private val dataStore: DataStore<Preferences>) {
     suspend fun saveUserImage(base64: String) {
         dataStore.edit { preferences ->
             preferences[IMAGE_KEY] = base64
+        }
+    }
+
+    suspend fun saveUserCity(city: String) {
+        dataStore.edit { preferences ->
+            preferences[CITY_KEY] = city
+        }
+    }
+    
+    suspend fun clearProfile() {
+        dataStore.edit { preferences ->
+            preferences.clear()
         }
     }
 }

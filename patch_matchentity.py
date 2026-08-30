@@ -1,13 +1,7 @@
 with open("app/src/main/java/com/example/MatchEntity.kt", "r") as f:
-    content = f.read()
+    text = f.read()
 
-target = """    val posterTrust: Double = 0.0
-)"""
-replacement = """    val posterTrust: Double = 0.0,
-    val lat: Double = 0.0,
-    val lng: Double = 0.0
-)"""
+text = text.replace('val category: String = "",', 'val category: String = "",\n    val city: String = "",')
 
-content = content.replace(target, replacement)
 with open("app/src/main/java/com/example/MatchEntity.kt", "w") as f:
-    f.write(content)
+    f.write(text)
