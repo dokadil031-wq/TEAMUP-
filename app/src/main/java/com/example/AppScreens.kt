@@ -99,6 +99,23 @@ fun PostDetailScreen(match: MatchEntity, viewModel: MaidanViewModel, onBack: () 
         Text(match.title, color = Chalk, fontSize = 24.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = (-1).sp, modifier = Modifier.padding(bottom = 12.dp), lineHeight = 28.sp)
         Text("Players: ${match.joined} / ${match.total}", color = Floodlight, fontSize = 14.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 12.dp))
         
+        if (match.postImageBase64.isNotEmpty()) {
+            val postBitmap = remember(match.postImageBase64) {
+                try {
+                    val imageBytes = Base64.decode(match.postImageBase64, Base64.DEFAULT)
+                    BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size)
+                } catch (e: Exception) { null }
+            }
+            if (postBitmap != null) {
+                Image(
+                    bitmap = postBitmap.asImageBitmap(),
+                    contentDescription = "Ground Photo",
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxWidth().height(180.dp).padding(bottom = 12.dp).clip(RoundedCornerShape(12.dp))
+                )
+            }
+        }
+        
         Column(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(Turf2).padding(14.dp).padding(bottom = 4.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = 12.dp)) {
                 Icon(Icons.Default.LocationOn, contentDescription = null, tint = Floodlight, modifier = Modifier.size(16.dp))
@@ -439,7 +456,27 @@ fun CreatePostScreen(viewModel: MaidanViewModel, onPostCreated: () -> Unit) {
     var audience by remember { mutableStateOf("All") }
     var totalPlayers by remember { mutableStateOf(4) }
     var playersDropdownExpanded by remember { mutableStateOf(false) }
+    var postImageBase64 by remember { mutableStateOf("") }
     val context = androidx.compose.ui.platform.LocalContext.current
+    val launcher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            val inputStream = context.contentResolver.openInputStream(uri)
+            val bitmap = BitmapFactory.decodeStream(inputStream)
+            if (bitmap != null) {
+                val outputStream = ByteArrayOutputStream()
+                val maxDim = 800
+                val scale = kotlin.math.min(maxDim.toFloat() / bitmap.width, maxDim.toFloat() / bitmap.height)
+                val w = (bitmap.width * scale).toInt()
+                val h = (bitmap.height * scale).toInt()
+                val resized = android.graphics.Bitmap.createScaledBitmap(bitmap, w, h, true)
+                resized.compress(android.graphics.Bitmap.CompressFormat.JPEG, 70, outputStream)
+                val bytes = outputStream.toByteArray()
+                postImageBase64 = Base64.encodeToString(bytes, Base64.DEFAULT)
+            }
+        }
+    }
     
     val categories = listOf("Sports", "Online gaming", "Exercise", "Group", "Other")
     val subcats = mapOf(
@@ -451,7 +488,7 @@ fun CreatePostScreen(viewModel: MaidanViewModel, onPostCreated: () -> Unit) {
 
     val valid = category.isNotEmpty() && (sport.isNotEmpty() || category == "Other") && title.isNotEmpty() && location.isNotEmpty() && dateStr.isNotEmpty() && timeStr.isNotEmpty()
 
-    Column(modifier = Modifier.fillMaxSize().padding(horizontal = 22.dp, vertical = 16.dp)) {
+    Column(modifier = Modifier.fillMaxSize().padding(horizontal = 22.dp, vertical = 16.dp).verticalScroll(rememberScrollState())) {
         Text("New post", color = Chalk, fontSize = 26.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = (-1).sp, modifier = Modifier.padding(bottom = 20.dp))
         
         Text("CATEGORY", color = Bench, fontSize = 12.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, modifier = Modifier.padding(bottom = 8.dp))
@@ -575,7 +612,7 @@ fun CreatePostScreen(viewModel: MaidanViewModel, onPostCreated: () -> Unit) {
         }
         
         Text("WHO CAN SEE THIS POST", color = Bench, fontSize = 12.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, modifier = Modifier.padding(bottom = 8.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth().padding(bottom = 26.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)) {
             listOf("All", "Male", "Female").forEach { a ->
                 val isSelected = audience == a
                 Box(
@@ -591,6 +628,28 @@ fun CreatePostScreen(viewModel: MaidanViewModel, onPostCreated: () -> Unit) {
             }
         }
         
+        Text("ATTACH GROUND/LOCATION PHOTO", color = Bench, fontSize = 12.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, modifier = Modifier.padding(bottom = 8.dp))
+        if (postImageBase64.isNotEmpty()) {
+            val imageBytes = Base64.decode(postImageBase64, Base64.DEFAULT)
+            val bitmap = BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size)
+            Box(modifier = Modifier.fillMaxWidth().height(150.dp).padding(bottom = 20.dp).clip(RoundedCornerShape(10.dp)).clickable {
+                launcher.launch(androidx.activity.result.PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+            }) {
+                Image(bitmap = bitmap.asImageBitmap(), contentDescription = "Attached Photo", contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+            }
+        } else {
+            Box(
+                modifier = Modifier.fillMaxWidth().height(100.dp).padding(bottom = 20.dp).clip(RoundedCornerShape(10.dp)).background(Turf2).border(1.dp, Line, RoundedCornerShape(10.dp))
+                    .clickable { launcher.launch(androidx.activity.result.PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
+                contentAlignment = Alignment.Center
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Icon(Icons.Default.Add, contentDescription = "Add Photo", tint = Floodlight, modifier = Modifier.size(32.dp))
+                    Text("Select Photo", color = Bench, fontSize = 12.sp)
+                }
+            }
+        }
+
         Button(
             onClick = {
                 val newMatch = MatchEntity(
@@ -606,7 +665,8 @@ fun CreatePostScreen(viewModel: MaidanViewModel, onPostCreated: () -> Unit) {
                     posterName = if (userName.isNotEmpty()) userName else "You",
                     posterTrust = 0.0,
                     timestamp = matchTimestamp,
-                    posterImageBase64 = userImage
+                    posterImageBase64 = userImage,
+                    postImageBase64 = postImageBase64
                 )
                 viewModel.addMatch(newMatch)
                 onPostCreated()

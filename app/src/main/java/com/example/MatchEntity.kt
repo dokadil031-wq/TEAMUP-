@@ -16,5 +16,6 @@ data class MatchEntity(
     val posterTrust: Double = 0.0,
     val timestamp: Long = 0L,
     val fullAtTimestamp: Long? = null,
-    val posterImageBase64: String = ""
+    val posterImageBase64: String = "",
+    val postImageBase64: String = ""
 )

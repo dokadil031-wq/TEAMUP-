@@ -24,6 +24,6 @@ dependencyResolutionManagement {
   }
 }
 
-rootProject.name = "Maidan"
+rootProject.name = "TeamUP"
 
 include(":app")

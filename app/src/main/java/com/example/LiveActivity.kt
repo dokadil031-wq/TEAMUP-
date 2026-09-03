@@ -13,8 +13,8 @@ class LiveActivity : AppCompatActivity() {
         val liveID = intent.getStringExtra("liveID") ?: "test_live_id"
         val userID = intent.getStringExtra("userID") ?: "user_${System.currentTimeMillis()}"
         val userName = intent.getStringExtra("userName") ?: "User"
-        val appID: Long = 259383851L
-        val appSign = "ead2e75a111bd2bfaddc3d0687cdd98175b3398"
+        val appID: Long = BuildConfig.ZEGO_APP_ID.toLong()
+        val appSign = BuildConfig.ZEGO_APP_SIGN
         
         val config = if (isHost) {
             ZegoUIKitPrebuiltLiveStreamingConfig.host(true)

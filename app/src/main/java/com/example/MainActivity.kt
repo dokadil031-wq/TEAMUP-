@@ -195,8 +195,8 @@ fun MaidanApp(modifier: Modifier = Modifier, viewModel: MaidanViewModel = viewMo
     androidx.compose.runtime.LaunchedEffect(currentUser?.uid, userName) {
         if (currentUser != null && userName.isNotEmpty()) {
             val application = context.applicationContext as android.app.Application
-            val appID: Long = 259383851L
-            val appSign = "ead2e75a111bd2bfaddc3d0687cdd98175b3398"
+            val appID: Long = BuildConfig.ZEGO_APP_ID.toLong()
+            val appSign = BuildConfig.ZEGO_APP_SIGN
             val config = com.zegocloud.uikit.prebuilt.call.invite.ZegoUIKitPrebuiltCallInvitationConfig()
             try {
                 try {
@@ -516,7 +516,7 @@ fun FeedScreen(viewModel: MaidanViewModel, onMatchClick: (MatchEntity) -> Unit, 
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text("Maidan", color = Chalk, fontSize = 28.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = (-1).sp)
+            Text("TeamUP", color = Chalk, fontSize = 28.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = (-1).sp)
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Box(modifier = Modifier.size(36.dp).clip(CircleShape).background(Turf2).clickable { onNotificationsClick() }, contentAlignment = Alignment.Center) {
                     Icon(Icons.Default.Notifications, contentDescription = "Notifications", tint = Floodlight, modifier = Modifier.size(18.dp))
@@ -624,6 +624,23 @@ fun MatchCard(m: MatchEntity, onClick: () -> Unit, onJoinClick: (() -> Unit)? = 
             Icon(Icons.Default.Star, contentDescription = null, tint = Floodlight, modifier = Modifier.size(11.dp))
             val ratingDisplay = if (m.posterTrust > 0) String.format("%.1f", m.posterTrust) else "New"
             Text(ratingDisplay, color = Floodlight, fontSize = 11.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+        }
+        
+        if (m.postImageBase64.isNotEmpty()) {
+            val postBitmap = androidx.compose.runtime.remember(m.postImageBase64) {
+                try {
+                    val imageBytes = android.util.Base64.decode(m.postImageBase64, android.util.Base64.DEFAULT)
+                    android.graphics.BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size)
+                } catch (e: Exception) { null }
+            }
+            if (postBitmap != null) {
+                androidx.compose.foundation.Image(
+                    bitmap = postBitmap.asImageBitmap(),
+                    contentDescription = null,
+                    contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                    modifier = Modifier.fillMaxWidth().height(140.dp).padding(bottom = 12.dp)
+                )
+            }
         }
         
         Column(modifier = Modifier.padding(horizontal = 18.dp).padding(bottom = 14.dp)) {
