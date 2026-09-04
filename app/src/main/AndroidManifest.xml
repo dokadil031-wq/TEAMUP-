@@ -33,6 +33,7 @@
             </intent-filter>
         </activity>
         <activity android:name=".LiveActivity" android:screenOrientation="fullSensor" android:theme="@style/Theme.AppCompat.Light.NoActionBar" />
+        <activity android:name=".ErrorActivity" android:exported="false" android:theme="@style/Theme.MyApplication" android:process=":error" />
     </application>
 
 </manifest>

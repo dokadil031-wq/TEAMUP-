@@ -7,6 +7,10 @@ import android.util.Log
 class MyApplication : Application() {
     override fun onCreate() {
         super.onCreate()
+        
+        val defaultHandler = Thread.getDefaultUncaughtExceptionHandler()
+        Thread.setDefaultUncaughtExceptionHandler(GlobalExceptionHandler(this, defaultHandler))
+        
         try {
             FirebaseApp.initializeApp(this)
             Log.d("INIT", "Firebase init success in Application class")

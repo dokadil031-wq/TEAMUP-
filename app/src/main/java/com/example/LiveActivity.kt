@@ -16,6 +16,12 @@ class LiveActivity : AppCompatActivity() {
         val appID: Long = BuildConfig.ZEGO_APP_ID.toLong()
         val appSign = BuildConfig.ZEGO_APP_SIGN
         
+        if (appSign == "YOUR_ZEGO_APP_SIGN_HERE" || appSign.length < 10) {
+            android.widget.Toast.makeText(this, "Live feature disabled: Missing Zego API Keys in this build.", android.widget.Toast.LENGTH_LONG).show()
+            finish()
+            return
+        }
+        
         val config = if (isHost) {
             ZegoUIKitPrebuiltLiveStreamingConfig.host(true)
         } else {

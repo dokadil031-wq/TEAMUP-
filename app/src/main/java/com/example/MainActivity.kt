@@ -197,6 +197,12 @@ fun MaidanApp(modifier: Modifier = Modifier, viewModel: MaidanViewModel = viewMo
             val application = context.applicationContext as android.app.Application
             val appID: Long = BuildConfig.ZEGO_APP_ID.toLong()
             val appSign = BuildConfig.ZEGO_APP_SIGN
+            
+            if (appSign == "YOUR_ZEGO_APP_SIGN_HERE" || appSign.length < 10) {
+                android.widget.Toast.makeText(context, "Live/Call feature disabled: Missing Zego API Keys in this build.", android.widget.Toast.LENGTH_LONG).show()
+                return@LaunchedEffect
+            }
+            
             val config = com.zegocloud.uikit.prebuilt.call.invite.ZegoUIKitPrebuiltCallInvitationConfig()
             try {
                 try {
