@@ -65,9 +65,6 @@ val LiveGreen = Color(0xFF22C55E)
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        try {
-            com.google.firebase.FirebaseApp.initializeApp(this)
-        } catch(e: Exception) { android.util.Log.e("INIT_ERROR", "Firebase init failed", e) }
         enableEdgeToEdge()
         setContent {
             MyApplicationTheme {

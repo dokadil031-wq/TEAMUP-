@@ -14,8 +14,8 @@ import kotlinx.coroutines.launch
 import com.google.firebase.firestore.Query
 
 class MaidanViewModel(application: Application) : AndroidViewModel(application) {
-    val db = FirebaseFirestore.getInstance()
-    val auth = FirebaseAuth.getInstance()
+    val db by lazy { FirebaseFirestore.getInstance() }
+    val auth by lazy { FirebaseAuth.getInstance() }
     private val userPrefsRepo = UserPreferencesRepository(application.dataStore)
 
     private val _allMatches = MutableStateFlow<List<MatchEntity>>(emptyList())
@@ -35,9 +35,6 @@ class MaidanViewModel(application: Application) : AndroidViewModel(application) 
     val userCity: StateFlow<String> = userPrefsRepo.userCity.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "")
 
     init {
-        try {
-            com.google.firebase.FirebaseApp.initializeApp(application)
-        } catch(e: Exception) { e.printStackTrace() }
         auth.firebaseAuthSettings.setAppVerificationDisabledForTesting(true)
         listenToMatches()
         viewModelScope.launch {
