@@ -2,7 +2,6 @@ package com.example
 
 import android.app.Application
 import com.google.firebase.FirebaseApp
-import com.google.firebase.FirebaseOptions
 import android.util.Log
 
 class MyApplication : Application() {
@@ -14,15 +13,8 @@ class MyApplication : Application() {
         
         try {
             if (FirebaseApp.getApps(this).isEmpty()) {
-                val options = FirebaseOptions.Builder()
-                    .setApplicationId("1:195869990157:android:e5e3d3f99f1094db902444")
-                    .setApiKey("AIzaSyAAMwYj_nAAZeIIT_MSRI079Y54np_mlg0")
-                    .setDatabaseUrl("https://teamup-bb90b-default-rtdb.firebaseio.com")
-                    .setProjectId("teamup-bb90b")
-                    .setStorageBucket("teamup-bb90b.firebasestorage.app")
-                    .build()
-                FirebaseApp.initializeApp(this, options)
-                Log.d("INIT", "Firebase explicit init success in Application class")
+                FirebaseApp.initializeApp(this)
+                Log.d("INIT", "Firebase init success in Application class")
             }
         } catch(e: Exception) {
             e.printStackTrace()
